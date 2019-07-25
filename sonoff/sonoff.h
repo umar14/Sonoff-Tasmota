@@ -152,13 +152,13 @@ const uint32_t LOOP_SLEEP_DELAY = 50;       // Lowest number of milliseconds to 
 #endif
 
 //enum ws2812NeopixelbusFeature { NEO_RGB, NEO_GRB, NEO_BRG, NEO_RBG, NEO_3LED, NEO_RGBW, NEO_GRBW };  // Doesn't work
-#define NEO_RGB                0            // Neopixel RGB leds
-#define NEO_GRB                1            // Neopixel GRB leds
-#define NEO_BRG                2            // Neopixel BRG leds
-#define NEO_RBG                3            // Neopixel RBG leds
-#define NEO_3LED               4            // Placeholder to test for 4 led types
-#define NEO_RGBW               5            // Neopixel RGBW leds
-#define NEO_GRBW               6            // Neopixel GRBW leds
+// #define NEO_RGB                0            // Neopixel RGB leds
+// #define NEO_GRB                1            // Neopixel GRB leds
+// #define NEO_BRG                2            // Neopixel BRG leds
+// #define NEO_RBG                3            // Neopixel RBG leds
+// #define NEO_3LED               4            // Placeholder to test for 4 led types
+// #define NEO_RGBW               5            // Neopixel RGBW leds
+// #define NEO_GRBW               6            // Neopixel GRBW leds
 
 #define LT_SM16716             16           // Lights that use SM16716 will have this bit set in light_type
 
