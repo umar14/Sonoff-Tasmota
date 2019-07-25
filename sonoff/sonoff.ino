@@ -72,6 +72,48 @@
 // Structs
 #include "settings.h"
 
+#include <WS2812FX.h>
+#include <Ticker.h>
+#include <FS.h>
+
+WS2812FX* strip;
+// WS2812FX ws2812fx = WS2812FX(NUMLEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+#include "my_led_config.h"
+#include "support_led.h"
+
+#ifdef ENABLE_STATE_SAVE_SPIFFS
+  Ticker spiffs_save_state;
+#endif
+
+
+// function to Initialize the strip
+void initStrip(uint16_t stripSize = WS2812FXStripSettings.stripSize, neoPixelType RGBOrder = WS2812FXStripSettings.RGBOrder, uint8_t pin = WS2812FXStripSettings.pin){
+  if (strip) {
+    delete strip;
+    WS2812FXStripSettings.stripSize = stripSize;
+    WS2812FXStripSettings.RGBOrder = RGBOrder;
+    WS2812FXStripSettings.pin = pin;
+  }
+  #ifndef LED_TYPE_WS2811
+    strip = new WS2812FX(stripSize, pin, RGBOrder + NEO_KHZ800);
+  #else
+    strip = new WS2812FX(stripSize, pin, RGBOrder + NEO_KHZ400);
+  #endif
+  
+  strip->init();
+  strip->setBrightness(brightness);
+  strip->setSpeed(convertSpeed(ws2812fx_speed));
+  //strip->setMode(ws2812fx_mode);
+  strip->setColor(main_color.red, main_color.green, main_color.blue);
+  strip->setOptions(0, GAMMA);  // We only have one WS2812FX segment, set color to human readable GAMMA correction
+  strip->start();
+  if(mode != HOLD) mode = SET_MODE;
+  #ifdef ENABLE_STATE_SAVE_SPIFFS
+    saveWS2812FXStripSettings.once(3, writeStripConfigFS);
+  #endif  
+}
+
 const char kSleepMode[] PROGMEM = "Dynamic|Normal";
 
 // Global variables
@@ -1562,6 +1604,35 @@ void setup(void)
 
   GpioInit();
 
+   // ***************************************************************************
+  // Setup: SPIFFS
+  // ***************************************************************************
+  #ifdef ENABLE_STATE_SAVE_SPIFFS 
+  SPIFFS.begin();
+  {
+    Dir dir = SPIFFS.openDir("/");
+    while (dir.next()) {
+      String fileName = dir.fileName();
+      size_t fileSize = dir.fileSize();
+      DBG_OUTPUT_PORT.printf("FS File: %s, size: %s\n", fileName.c_str(), formatBytes(fileSize).c_str());
+    }
+
+    FSInfo fs_info;
+    SPIFFS.info(fs_info);
+    DBG_OUTPUT_PORT.printf("FS Usage: %d/%d bytes\n\n", fs_info.usedBytes, fs_info.totalBytes);
+  }
+  readStripConfigFS(); // Read config from FS first
+  #endif  
+
+  // ***************************************************************************
+  // Setup: Neopixel
+  // ***************************************************************************
+  initStrip();
+  
+  #ifdef ENABLE_STATE_SAVE_SPIFFS
+    (readStateFS()) ? DBG_OUTPUT_PORT.println(" Success!") : DBG_OUTPUT_PORT.println(" Failure!");
+  #endif
+
   SetSerialBaudrate(baudrate);
 
   WifiConnect();
@@ -1634,6 +1705,99 @@ uint32_t _counter = 0;
 
 void loop(void)
 {
+  // Simple statemachine that handles the different modes of WS2812 LEDStrip
+  if (mode == SET_MODE) {
+    // AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: SET_MODE: %d %d"),  ws2812fx_mode, mode);
+    if(strip) strip->setMode(ws2812fx_mode);
+    if(strip) strip->trigger();
+    prevmode = SET_MODE;
+    mode = SETCOLOR;
+  }
+  if (mode == OFF) {
+    if(strip){
+      if(strip->isRunning()) strip->stop(); //should clear memory
+      // mode = HOLD;
+    }
+  }
+  if (mode == SETCOLOR) {
+    if(strip) strip->setColor(main_color.red, main_color.green, main_color.blue);
+    if(strip) strip->trigger();
+    mode = (prevmode == SET_MODE) ? SETSPEED : HOLD;
+  }
+  if (mode == SETSPEED) {
+    if(strip) strip->setSpeed(convertSpeed(ws2812fx_speed));
+    if(strip) strip->trigger();
+    mode = (prevmode == SET_MODE) ? BRIGHTNESS : HOLD;
+  }
+  if (mode == BRIGHTNESS) {
+    if(strip) strip->setBrightness(brightness);
+    if(strip) strip->trigger();
+    if (prevmode == SET_MODE) prevmode = HOLD;
+    mode = HOLD;
+  }
+  #ifdef ENABLE_LEGACY_ANIMATIONS
+    if (mode == WIPE) {
+      if(strip) strip->setColor(main_color.red, main_color.green, main_color.blue);
+      if(strip) strip->setMode(FX_MODE_COLOR_WIPE);
+      if(strip) strip->trigger();
+      mode = HOLD;
+    }
+    if (mode == RAINBOW) {
+      if(strip) strip->setMode(FX_MODE_RAINBOW);
+      if(strip) strip->trigger();
+      mode = HOLD;
+    }
+    if (mode == RAINBOWCYCLE) {
+      if(strip) strip->setMode(FX_MODE_RAINBOW_CYCLE);
+      if(strip) strip->trigger();
+      mode = HOLD;
+    }
+    if (mode == THEATERCHASE) {
+      if(strip) strip->setColor(main_color.red, main_color.green, main_color.blue);
+      if(strip) strip->setMode(FX_MODE_THEATER_CHASE);
+      if(strip) strip->trigger();
+      mode = HOLD;
+    }
+    if (mode == TWINKLERANDOM) {
+      if(strip) strip->setColor(main_color.red, main_color.green, main_color.blue);
+      if(strip) strip->setMode(FX_MODE_TWINKLE_RANDOM);
+      if(strip) strip->trigger();
+      mode = HOLD;
+    }
+    if (mode == THEATERCHASERAINBOW) {
+      if(strip) strip->setMode(FX_MODE_THEATER_CHASE_RAINBOW);
+      if(strip) strip->trigger();
+      mode = HOLD;
+    }
+  #endif
+  if (mode == HOLD || mode == CUSTOM) {
+    if(strip)
+    {
+      if(!strip->isRunning()) strip->start();
+    }
+    #ifdef ENABLE_LEGACY_ANIMATIONS
+      if (exit_func) {
+        exit_func = false;
+      }
+    #endif
+    if (prevmode == SET_MODE) prevmode = HOLD;
+  }
+
+  // Only for modes with WS2812FX functionality
+  #ifdef ENABLE_LEGACY_ANIMATIONS
+  if (mode != TV && mode != CUSTOM) {
+  #else
+  if (mode != CUSTOM) {
+  #endif
+    if(strip) strip->service();
+  }
+
+  #ifdef ENABLE_STATE_SAVE_SPIFFS
+    if (updateStateFS) {
+      (writeStateFS()) ? DBG_OUTPUT_PORT.println(" Success!") : DBG_OUTPUT_PORT.println(" Failure!");
+    }
+  #endif
+
   uint32_t my_sleep = millis();
 
   XdrvCall(FUNC_LOOP);

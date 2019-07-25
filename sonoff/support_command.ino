@@ -117,6 +117,110 @@ void CommandHandler(char* topic, uint8_t* data, unsigned int data_len)
   memcpy(dataBuf, data +i, sizeof(dataBuf));
   dataBuf[sizeof(dataBuf)-1] = 0;
 
+  // # ==> Set main color
+  if (dataBuf[0] == '#') {
+    handleSetMainColor((uint8_t *)dataBuf);    
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set main color to: R: [%u] G: [%u] B: [%u]"),  main_color.red, main_color.green, main_color.blue);
+    #ifdef ENABLE_STATE_SAVE_SPIFFS
+      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
+    #endif
+  }
+
+  // ? ==> Set speed
+  if (dataBuf[0] == '?') {
+    uint8_t d = (uint8_t) strtol((const char *) &dataBuf[1], NULL, 10);
+    ws2812fx_speed = constrain(d, 0, 255);
+    mode = SETSPEED;
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set speed to: [%u]"),  ws2812fx_speed);
+  }
+
+  // % ==> Set brightness
+  if (dataBuf[0] == '%') {
+    uint8_t b = (uint8_t) strtol((const char *) &dataBuf[1], NULL, 10);
+    brightness = constrain(b, 0, 255);
+    mode = BRIGHTNESS;
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set brightness to: [%u]"), brightness);    
+    #ifdef ENABLE_STATE_SAVE_SPIFFS
+      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
+    #endif
+  }
+
+  // * ==> Set main color and light all LEDs (Shortcut)
+  if (dataBuf[0] == '*') {
+    handleSetAllMode((uint8_t *)dataBuf);    
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set main color and light all LEDs [%s]"), dataBuf);  
+    #ifdef ENABLE_STATE_SAVE_SPIFFS
+      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
+    #endif
+  }
+
+  // ! ==> Set single LED in given color
+  if (dataBuf[0] == '!') {
+    handleSetSingleLED((uint8_t *)dataBuf, 1);
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set single LED in given color [%s]"), dataBuf);  
+  }
+
+  // + ==> Set multiple LED in the given colors
+  if (dataBuf[0] == '+') {
+    handleSetDifferentColors((uint8_t *)dataBuf);
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set multiple LEDs in given color [%s]"), dataBuf);
+  }
+
+  // + ==> Set range of LEDs in the given color
+  if (dataBuf[0] == 'R') {
+    handleRangeDifferentColors((uint8_t *)dataBuf);    
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set range of LEDs in given color [%s]"), dataBuf);
+  }
+
+  #ifdef ENABLE_LEGACY_ANIMATIONS
+    // = ==> Activate named mode
+    if (dataBuf[0] == '=') {
+      // we get mode data
+      String str_mode = String((char *) &dataBuf[0]);
+
+      handleSetNamedMode(str_mode);        
+      snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+      MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+      AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Activated mode [%u]!"), mode);
+      #ifdef ENABLE_STATE_SAVE_SPIFFS
+        if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
+      #endif
+    }
+  #endif
+
+  // $ ==> Get status Info.
+  if (dataBuf[0] == '$') {
+      String json = listStatusJSON();    
+      snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), json.c_str());
+      MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+      AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Get status info: %s"), json.c_str());
+  }
+
+  // / ==> Set WS2812 mode.
+  if (dataBuf[0] == '/') {
+    handleSetWS2812FXMode((uint8_t *)dataBuf);    
+    snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
+    MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set WS2812 mode: [%s]"), dataBuf);
+    #ifdef ENABLE_STATE_SAVE_SPIFFS
+      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
+    #endif
+  }
+
   if (topicBuf[0] != '/') { ShowSource(SRC_MQTT); }
 
   AddLog_P2(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_RESULT D_RECEIVED_TOPIC " %s, " D_DATA_SIZE " %d, " D_DATA " %s"), topicBuf, data_len, dataBuf);
