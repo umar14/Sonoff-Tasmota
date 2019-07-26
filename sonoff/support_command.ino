@@ -123,9 +123,6 @@ void CommandHandler(char* topic, uint8_t* data, unsigned int data_len)
     snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
     MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
     AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set main color to: R: [%u] G: [%u] B: [%u]"),  main_color.red, main_color.green, main_color.blue);
-    #ifdef ENABLE_STATE_SAVE_SPIFFS
-      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-    #endif
   }
 
   // ? ==> Set speed
@@ -145,10 +142,7 @@ void CommandHandler(char* topic, uint8_t* data, unsigned int data_len)
     mode = BRIGHTNESS;
     snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
     MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
-    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set brightness to: [%u]"), brightness);    
-    #ifdef ENABLE_STATE_SAVE_SPIFFS
-      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-    #endif
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set brightness to: [%u]"), brightness);   
   }
 
   // * ==> Set main color and light all LEDs (Shortcut)
@@ -157,9 +151,6 @@ void CommandHandler(char* topic, uint8_t* data, unsigned int data_len)
     snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
     MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
     AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set main color and light all LEDs [%s]"), dataBuf);  
-    #ifdef ENABLE_STATE_SAVE_SPIFFS
-      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-    #endif
   }
 
   // ! ==> Set single LED in given color
@@ -186,22 +177,16 @@ void CommandHandler(char* topic, uint8_t* data, unsigned int data_len)
     AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set range of LEDs in given color [%s]"), dataBuf);
   }
 
-  #ifdef ENABLE_LEGACY_ANIMATIONS
-    // = ==> Activate named mode
-    if (dataBuf[0] == '=') {
+  // = ==> Activate named mode
+  if (dataBuf[0] == '=') {
       // we get mode data
       String str_mode = String((char *) &dataBuf[0]);
-
       handleSetNamedMode(str_mode);        
       snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
       MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
       AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Activated mode [%u]!"), mode);
-      #ifdef ENABLE_STATE_SAVE_SPIFFS
-        if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-      #endif
-    }
-  #endif
-
+  }
+  
   // $ ==> Get status Info.
   if (dataBuf[0] == '$') {
       String json = listStatusJSON();    
@@ -216,9 +201,6 @@ void CommandHandler(char* topic, uint8_t* data, unsigned int data_len)
     snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("OK -> %s "), dataBuf);
     MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_LED), mqtt_data);  
     AddLog_P2(LOG_LEVEL_INFO, PSTR("LED: Set WS2812 mode: [%s]"), dataBuf);
-    #ifdef ENABLE_STATE_SAVE_SPIFFS
-      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-    #endif
   }
 
   if (topicBuf[0] != '/') { ShowSource(SRC_MQTT); }
